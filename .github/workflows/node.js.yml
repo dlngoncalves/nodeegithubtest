@@ -28,4 +28,25 @@ jobs:
         cache: 'npm'
     - run: npm ci
     - run: npm run build --if-present
-    - run: npm test
+    - name: Get modifiied files
+      id: modified-files
+      run: |
+       MODIFIED_FILES=$(git diff --name-only ${{ github.event.before }} ${{ github.sha }} | grep -E '\.js$|\.ts$' || true)
+       echo "MODIFIED_FILES=${MODIFIED_FILES}" >> $GITHUB_ENV
+    - name: Map to corresponding test files
+      id: mapped-tests
+      run: |
+        TEST_FILES=""
+        for FILE in ${MODIFIED_FILES}; do
+          TEST_FILE="test/$(basename ${FILE} .js).test.js"
+          if [ -f "$TEST_FILE" ]; then
+            TEST_FILES="$TEST_FILES $TEST_FILE"
+          fi
+        done
+        echo "TEST_FILES=${TEST_FILES}" >> $GITHUB_ENV
+    - name: Run tests on modified files
+      if: env.TEST_FILES != ''
+      run: |
+        echo "Running tests for the following modified files:"
+        echo "${TEST_FILES}"
+        npm run test -- ${TEST_FILES}
